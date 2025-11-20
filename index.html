@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Novo Relatório de Monitoria</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "sans-serif"],
+            },
+            colors: {
+              primary: "#005A9C",
+              "primary-dark": "#004a80",
+              "background-light": "#F0F2F5",
+              "background-dark": "#101922",
+              danger: "#D32F2F",
+              surface: {
+                light: "#FFFFFF",
+                dark: "rgba(17, 24, 39, 0.5)", 
+              }
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        background-color: #F0F2F5;
+      }
+      .dark body {
+        background-color: #101922;
+      }
+      /* Hide scrollbar for clean UI but keep functionality */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+
+      /* Print styles for PDF generation */
+      @media print {
+        header, footer, button { 
+          display: none !important; 
+        }
+        body { 
+          background-color: white !important; 
+          color: black !important; 
+          -webkit-print-color-adjust: exact;
+        }
+        input, textarea, select, .dark input, .dark textarea, .dark select { 
+          border: none !important; 
+          background: transparent !important; 
+          color: black !important;
+          resize: none; 
+          box-shadow: none !important;
+          padding-left: 0 !important;
+        }
+        textarea {
+            height: auto !important;
+            overflow: visible !important;
+        }
+        /* Ensure dark mode text is black when printing */
+        .dark body, .dark .text-white, .dark .text-gray-300 {
+            color: black !important;
+        }
+        .dark .bg-gray-900\/50, .dark .bg-gray-800 {
+            background: transparent !important;
+            border: 1px solid #ddd !important;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
