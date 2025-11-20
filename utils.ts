@@ -1,4 +1,6 @@
 import { ReportFormState, PauseBlock } from './types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * Converts HH:MM string to total minutes
@@ -185,19 +187,11 @@ export const generateReportHtml = (data: ReportFormState): string => {
  * Generates a PDF file using jsPDF
  */
 export const generatePDF = (data: ReportFormState) => {
-  // Access global jsPDF from script tags
-  const w = window as any;
-  if (!w.jspdf) {
-    alert('PDF generation library not loaded yet. Please try again.');
-    return;
-  }
-
-  const { jsPDF } = w.jspdf;
   const doc = new jsPDF();
   
   // Colors
-  const primaryColor = [0, 90, 156]; // #005A9C
-  const grayColor = [80, 80, 80];
+  const primaryColor: [number, number, number] = [0, 90, 156]; // #005A9C
+  const grayColor: [number, number, number] = [80, 80, 80];
 
   // Header
   doc.setFontSize(20);
@@ -251,7 +245,7 @@ export const generatePDF = (data: ReportFormState) => {
     p.endTime || '-'
   ]);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['Início', 'Intervalo', 'Término']],
     body: tableBody,
