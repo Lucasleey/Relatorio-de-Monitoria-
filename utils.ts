@@ -1,4 +1,4 @@
-import { ReportFormState } from './types';
+import { ReportFormState, PauseBlock } from './types';
 
 /**
  * Converts HH:MM string to total minutes
@@ -47,6 +47,14 @@ export const addTime = (start: string, duration: string): string => {
 };
 
 /**
+ * Calculates the sum of all pause intervals
+ */
+export const calculateTotalPauses = (pauses: PauseBlock[]): string => {
+  const totalMinutes = pauses.reduce((acc, curr) => acc + timeToMinutes(curr.interval), 0);
+  return minutesToTime(totalMinutes);
+};
+
+/**
  * Triggers a file download in the browser
  */
 export const downloadFile = (filename: string, content: string, mimeType: string) => {
@@ -65,6 +73,8 @@ export const downloadFile = (filename: string, content: string, mimeType: string
  * Generates a plain text report
  */
 export const generateReportText = (data: ReportFormState): string => {
+  const totalPauseTime = calculateTotalPauses(data.pauses);
+  
   return `RELATÓRIO DE MONITORIA
     
 INFORMAÇÕES GERAIS
@@ -79,6 +89,8 @@ Momento: ${data.communicationTime}
 PAUSAS
 ------
 ${data.pauses.map((p, i) => `Bloco ${i + 1}: Início ${p.startTime} | Intervalo ${p.interval} | Término ${p.endTime}`).join('\n')}
+
+Tempo Total de Pausas: ${totalPauseTime}
 
 OBSERVAÇÕES
 -----------
@@ -97,6 +109,8 @@ ${data.supervisorNote}
  * Generates an HTML report for Word/Print
  */
 export const generateReportHtml = (data: ReportFormState): string => {
+  const totalPauseTime = calculateTotalPauses(data.pauses);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -113,6 +127,7 @@ export const generateReportHtml = (data: ReportFormState): string => {
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
+        .total-row td { font-weight: bold; background-color: #e6f3ff; }
         .notes { background-color: #f9f9f9; padding: 15px; border-radius: 4px; border: 1px solid #eee; white-space: pre-wrap; }
     </style>
     </head>
@@ -144,6 +159,10 @@ export const generateReportHtml = (data: ReportFormState): string => {
                 <td>${p.endTime || '-'}</td>
               </tr>
             `).join('')}
+            <tr class="total-row">
+              <td colspan="2" style="text-align: right;">Tempo Total de Pausas:</td>
+              <td>${totalPauseTime}</td>
+            </tr>
           </tbody>
         </table>
 
@@ -160,4 +179,128 @@ export const generateReportHtml = (data: ReportFormState): string => {
     </body>
     </html>
     `;
+};
+
+/**
+ * Generates a PDF file using jsPDF
+ */
+export const generatePDF = (data: ReportFormState) => {
+  // Access global jsPDF from script tags
+  const w = window as any;
+  if (!w.jspdf) {
+    alert('PDF generation library not loaded yet. Please try again.');
+    return;
+  }
+
+  const { jsPDF } = w.jspdf;
+  const doc = new jsPDF();
+  
+  // Colors
+  const primaryColor = [0, 90, 156]; // #005A9C
+  const grayColor = [80, 80, 80];
+
+  // Header
+  doc.setFontSize(20);
+  doc.setTextColor(...primaryColor);
+  doc.text("Relatório de Monitoria", 14, 20);
+  doc.setDrawColor(...primaryColor);
+  doc.setLineWidth(0.5);
+  doc.line(14, 25, 196, 25);
+
+  let y = 35;
+
+  // General Info
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Informações Gerais", 14, y);
+  y += 10;
+
+  doc.setFontSize(10);
+  doc.setTextColor(...grayColor);
+  
+  const addField = (label: string, value: string, x: number, currentY: number) => {
+    doc.setFont(undefined, 'bold');
+    doc.text(`${label}:`, x, currentY);
+    doc.setFont(undefined, 'normal');
+    doc.text(value || '-', x + 45, currentY);
+  };
+
+  addField("Tipo de Monitoria", data.monitoriaType, 14, y);
+  y += 7;
+  addField("Operador", data.operatorData, 14, y);
+  y += 7;
+  addField("Data", data.date, 14, y);
+  addField("Contrato", data.contract, 110, y);
+  y += 7;
+  addField("Protocolo", data.protocol, 14, y);
+  y += 7;
+  addField("Momento", data.communicationTime, 14, y);
+  
+  y += 15;
+
+  // Pauses Table
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Gestão de Pausas", 14, y);
+  y += 5;
+
+  const totalPauseTime = calculateTotalPauses(data.pauses);
+  const tableBody = data.pauses.map(p => [
+    p.startTime || '-',
+    p.interval || '-',
+    p.endTime || '-'
+  ]);
+
+  (doc as any).autoTable({
+    startY: y,
+    head: [['Início', 'Intervalo', 'Término']],
+    body: tableBody,
+    theme: 'striped',
+    headStyles: { fillColor: primaryColor },
+    foot: [['', 'Total de Pausas:', totalPauseTime]],
+    footStyles: { fillColor: [240, 242, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
+    margin: { top: 10 },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 15;
+
+  // Observations
+  const checkPageBreak = (neededHeight: number) => {
+    if (y + neededHeight > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  };
+
+  checkPageBreak(20);
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Observações", 14, y);
+  y += 10;
+
+  const addNoteSection = (title: string, content: string) => {
+    checkPageBreak(30);
+    doc.setFontSize(11);
+    doc.setTextColor(...primaryColor);
+    doc.setFont(undefined, 'bold');
+    doc.text(title, 14, y);
+    y += 6;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont(undefined, 'normal');
+    
+    const splitText = doc.splitTextToSize(content || 'Nenhuma observação.', 180);
+    checkPageBreak(splitText.length * 5 + 10);
+    doc.text(splitText, 14, y);
+    y += (splitText.length * 5) + 8;
+  };
+
+  addNoteSection("Notas do Monitor", data.monitorNotes);
+  addNoteSection("Pontos a Observar", data.observationPoints);
+  addNoteSection("Nota para Supervisor", data.supervisorNote);
+
+  // Save
+  const cleanProtocol = (data.protocol || 'novo').replace(/[^a-z0-9]/gi, '_');
+  doc.save(`relatorio_monitoria_${cleanProtocol}.pdf`);
 };

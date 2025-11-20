@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Novo Relatório de Monitoria</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -53,38 +55,6 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #555;
-      }
-
-      /* Print styles for PDF generation */
-      @media print {
-        header, footer, button { 
-          display: none !important; 
-        }
-        body { 
-          background-color: white !important; 
-          color: black !important; 
-          -webkit-print-color-adjust: exact;
-        }
-        input, textarea, select, .dark input, .dark textarea, .dark select { 
-          border: none !important; 
-          background: transparent !important; 
-          color: black !important;
-          resize: none; 
-          box-shadow: none !important;
-          padding-left: 0 !important;
-        }
-        textarea {
-            height: auto !important;
-            overflow: visible !important;
-        }
-        /* Ensure dark mode text is black when printing */
-        .dark body, .dark .text-white, .dark .text-gray-300 {
-            color: black !important;
-        }
-        .dark .bg-gray-900\/50, .dark .bg-gray-800 {
-            background: transparent !important;
-            border: 1px solid #ddd !important;
-        }
       }
     </style>
   <script type="importmap">

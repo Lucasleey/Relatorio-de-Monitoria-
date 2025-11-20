@@ -5,7 +5,7 @@ import { GeneralInfoSection } from './components/GeneralInfoSection';
 import { PauseSection } from './components/PauseSection';
 import { ObservationSection } from './components/ObservationSection';
 import { ReportFormState, MonitoriaType, PauseBlock } from './types';
-import { downloadFile, generateReportHtml, generateReportText } from './utils';
+import { downloadFile, generateReportHtml, generateReportText, generatePDF } from './utils';
 
 const INITIAL_STATE: ReportFormState = {
   monitoriaType: MonitoriaType.RETENCAO,
@@ -38,9 +38,8 @@ function App() {
     const filename = `relatorio_${formData.protocol || 'novo'}`;
 
     if (format === 'pdf') {
-      // For PDF, we trigger the browser print dialog which allows "Save as PDF"
-      // The print styles in index.html will clean up the view
-      window.print();
+      // Use jsPDF to generate a true PDF file download
+      generatePDF(formData);
     } else if (format === 'word') {
       // Generate an HTML file with .doc extension which Word can open
       const content = generateReportHtml(formData);

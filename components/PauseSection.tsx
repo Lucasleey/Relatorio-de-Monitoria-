@@ -1,7 +1,7 @@
 import React from 'react';
-import { PlusCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, AlertCircle, Trash2, Clock } from 'lucide-react';
 import { PauseBlock, DEFAULT_PAUSE_LIMIT_MINUTES } from '../types';
-import { timeToMinutes, minutesToTime, calculateDuration, addTime } from '../utils';
+import { timeToMinutes, minutesToTime, calculateDuration, addTime, calculateTotalPauses } from '../utils';
 
 interface Props {
   pauses: PauseBlock[];
@@ -47,11 +47,15 @@ export const PauseSection: React.FC<Props> = ({ pauses, onChange }) => {
     onChange(updatedPauses);
   };
 
+  const totalPauseTime = calculateTotalPauses(pauses);
+
   return (
     <section className="px-4 pb-6">
-      <h2 className="mb-4 text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-        Gestão de Pausas
-      </h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+          Gestão de Pausas
+        </h2>
+      </div>
       
       <div className="space-y-4">
         {pauses.map((pause) => (
@@ -63,6 +67,16 @@ export const PauseSection: React.FC<Props> = ({ pauses, onChange }) => {
             showRemove={pauses.length > 1}
           />
         ))}
+
+        <div className="flex items-center justify-between rounded-xl bg-primary/5 p-3 px-4 dark:bg-primary/10">
+          <div className="flex items-center gap-2 text-primary">
+            <Clock className="h-5 w-5" />
+            <span className="font-semibold">Tempo Total Acumulado:</span>
+          </div>
+          <span className="text-lg font-bold text-gray-900 dark:text-white">
+            {totalPauseTime}
+          </span>
+        </div>
 
         <button
           onClick={addPauseBlock}
@@ -120,7 +134,7 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
       {/* Status Bar */}
       <div className="mt-4 flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2.5 dark:bg-gray-800">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Tempo Total:
+          Tempo do Bloco:
         </span>
         <div className="flex items-center gap-2">
           <span className={`text-sm font-bold ${limitExceeded ? 'text-danger' : 'text-gray-900 dark:text-white'}`}>
@@ -130,7 +144,7 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
             <>
               <AlertCircle className="h-4 w-4 text-danger" />
               <span className="text-xs font-medium text-danger">
-                (Excedeu {minutesToTime(DEFAULT_PAUSE_LIMIT_MINUTES)})
+                (Max {minutesToTime(DEFAULT_PAUSE_LIMIT_MINUTES)})
               </span>
             </>
           )}
