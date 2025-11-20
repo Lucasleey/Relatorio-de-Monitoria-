@@ -213,9 +213,9 @@ export const generatePDF = (data: ReportFormState) => {
   doc.setTextColor(...grayColor);
   
   const addField = (label: string, value: string, x: number, currentY: number) => {
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text(`${label}:`, x, currentY);
-    doc.setFont(undefined, 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.text(value || '-', x + 45, currentY);
   };
 
@@ -276,13 +276,13 @@ export const generatePDF = (data: ReportFormState) => {
     checkPageBreak(30);
     doc.setFontSize(11);
     doc.setTextColor(...primaryColor);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text(title, 14, y);
     y += 6;
     
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
-    doc.setFont(undefined, 'normal');
+    doc.setFont('helvetica', 'normal');
     
     const splitText = doc.splitTextToSize(content || 'Nenhuma observação.', 180);
     checkPageBreak(splitText.length * 5 + 10);
