@@ -94,7 +94,7 @@ function App() {
         />
       </main>
 
-      <Footer onDownload={handleDownload} />
+      <Footer onDownload={() => handleDownload('pdf')} />
     </div>
   );
 }

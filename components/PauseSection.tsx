@@ -2,7 +2,7 @@
 import React from 'react';
 import { PlusCircle, AlertCircle, Trash2, Clock, AlertTriangle, Timer } from 'lucide-react';
 import { PauseBlock, DEFAULT_PAUSE_LIMIT_MINUTES } from '../types';
-import { timeToMinutes, minutesToTime, calculateDuration, calculateTotalPauses, sumTime } from '../utils';
+import { timeToMinutes, minutesToTime, calculateDuration } from '../utils';
 
 interface Props {
   pauses: PauseBlock[];

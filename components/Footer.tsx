@@ -1,28 +1,18 @@
 import React from 'react';
-import { FileText, FileType2, FileUp } from 'lucide-react';
+import { FileType2 } from 'lucide-react';
 
 interface FooterProps {
-  onDownload: (format: 'word' | 'pdf' | 'docs') => void;
+  onDownload: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onDownload }) => {
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-background-light/90 px-4 py-3 backdrop-blur-sm dark:border-gray-700 dark:bg-background-dark/90">
-      <div className="mx-auto flex max-w-screen-md items-center justify-center gap-3">
-        <ActionButton 
-          icon={<FileText className="h-5 w-5" />} 
-          label="Word" 
-          onClick={() => onDownload('word')}
-        />
+      <div className="mx-auto flex w-full max-w-xs items-center justify-center">
         <ActionButton 
           icon={<FileType2 className="h-5 w-5" />} 
-          label="PDF" 
-          onClick={() => onDownload('pdf')}
-        />
-        <ActionButton 
-          icon={<FileUp className="h-5 w-5" />} 
-          label="Docs" 
-          onClick={() => onDownload('docs')}
+          label="Baixar PDF" 
+          onClick={onDownload}
         />
       </div>
     </footer>
@@ -38,9 +28,9 @@ interface ActionButtonProps {
 const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick }) => (
   <button 
     onClick={onClick}
-    className="group flex h-12 flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-primary/10 text-primary transition-all hover:bg-primary/20 active:scale-95 dark:bg-primary/20 dark:hover:bg-primary/30"
+    className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary/10 text-primary transition-all hover:bg-primary/20 active:scale-95 dark:bg-primary/20 dark:hover:bg-primary/30"
   >
     {icon}
-    <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+    <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
   </button>
 );
