@@ -1,7 +1,8 @@
 
+
 export enum MonitoriaType {
   RETENCAO = 'Retenção',
-  SAC = 'SAC',
+  SAC = 'SAC Ligação',
   SAC_WHATSAPP = 'SAC Whatsapp',
 }
 
