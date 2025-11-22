@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -15,8 +16,8 @@ const INITIAL_STATE: ReportFormState = {
   protocol: '',
   communicationTime: '',
   pauses: [
-    { id: '1', startTime: '09:00', interval: '01:45', endTime: '10:45' }, // Default dummy data to match screenshot feel
-    { id: '2', startTime: '', interval: '', endTime: '' }
+    { id: '1', startTime: '09:00', interval: '', endTime: '10:45', isNegative: false, useIntervalMode: false }, 
+    { id: '2', startTime: '', interval: '', endTime: '', isNegative: false, useIntervalMode: false }
   ],
   monitorNotes: '',
   observationPoints: '',
@@ -32,6 +33,23 @@ function App() {
 
   const handlePausesChange = (pauses: PauseBlock[]) => {
     setFormData((prev) => ({ ...prev, pauses }));
+  };
+
+  const handleClear = () => {
+    if (window.confirm('Tem certeza que deseja limpar todo o relatório? Todas as informações serão perdidas.')) {
+      setFormData({
+        monitoriaType: MonitoriaType.RETENCAO,
+        operatorData: '',
+        date: '',
+        contract: '',
+        protocol: '',
+        communicationTime: '',
+        pauses: [{ id: crypto.randomUUID(), startTime: '', interval: '', endTime: '', isNegative: false, useIntervalMode: false }],
+        monitorNotes: '',
+        observationPoints: '',
+        supervisorNote: '',
+      });
+    }
   };
 
   const handleDownload = (format: 'word' | 'pdf' | 'docs') => {
@@ -53,7 +71,7 @@ function App() {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-background-light font-sans dark:bg-background-dark">
-      <Header />
+      <Header onClear={handleClear} />
       
       <main className="flex-grow pb-32 print:pb-0">
         <GeneralInfoSection 

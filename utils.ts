@@ -1,3 +1,4 @@
+
 import { ReportFormState, PauseBlock } from './types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -49,6 +50,21 @@ export const addTime = (start: string, duration: string): string => {
 };
 
 /**
+ * Sums two time strings (Time A + Time B)
+ * Used for the "Interval Mode" calculation
+ */
+export const sumTime = (timeA: string, timeB: string): string => {
+  if (!timeA) return timeB || '';
+  if (!timeB) return timeA || '';
+  
+  const minsA = timeToMinutes(timeA);
+  const minsB = timeToMinutes(timeB);
+  
+  // Simple sum without 24h modulo, assuming durations for reporting
+  return minutesToTime(minsA + minsB);
+};
+
+/**
  * Calculates the sum of all pause intervals
  */
 export const calculateTotalPauses = (pauses: PauseBlock[]): string => {
@@ -90,7 +106,7 @@ Momento: ${data.communicationTime}
 
 PAUSAS
 ------
-${data.pauses.map((p, i) => `Bloco ${i + 1}: Início ${p.startTime} | Intervalo ${p.interval} | Término ${p.endTime}`).join('\n')}
+${data.pauses.map((p, i) => `Bloco ${i + 1}: Início ${p.startTime} | Intervalo ${p.interval} | Término ${p.endTime} ${p.isNegative ? '(Negativo)' : ''}`).join('\n')}
 
 Tempo Total de Pausas: ${totalPauseTime}
 
@@ -131,6 +147,7 @@ export const generateReportHtml = (data: ReportFormState): string => {
         th { background-color: #f2f2f2; }
         .total-row td { font-weight: bold; background-color: #e6f3ff; }
         .notes { background-color: #f9f9f9; padding: 15px; border-radius: 4px; border: 1px solid #eee; white-space: pre-wrap; }
+        .negative { color: #D32F2F; font-weight: bold; }
     </style>
     </head>
     <body>
@@ -151,18 +168,20 @@ export const generateReportHtml = (data: ReportFormState): string => {
               <th>Início</th>
               <th>Intervalo</th>
               <th>Término</th>
+              <th>Tipo</th>
             </tr>
           </thead>
           <tbody>
             ${data.pauses.map(p => `
-              <tr>
+              <tr class="${p.isNegative ? 'negative' : ''}">
                 <td>${p.startTime || '-'}</td>
                 <td>${p.interval || '-'}</td>
                 <td>${p.endTime || '-'}</td>
+                <td>${p.isNegative ? 'Negativo' : 'Normal'}</td>
               </tr>
             `).join('')}
             <tr class="total-row">
-              <td colspan="2" style="text-align: right;">Tempo Total de Pausas:</td>
+              <td colspan="3" style="text-align: right;">Tempo Total de Pausas:</td>
               <td>${totalPauseTime}</td>
             </tr>
           </tbody>
@@ -192,6 +211,7 @@ export const generatePDF = (data: ReportFormState) => {
   // Colors
   const primaryColor: [number, number, number] = [0, 90, 156]; // #005A9C
   const grayColor: [number, number, number] = [80, 80, 80];
+  const dangerColor: [number, number, number] = [211, 47, 47]; // #D32F2F
 
   // Header
   doc.setFontSize(20);
@@ -239,21 +259,35 @@ export const generatePDF = (data: ReportFormState) => {
   y += 5;
 
   const totalPauseTime = calculateTotalPauses(data.pauses);
+  
   const tableBody = data.pauses.map(p => [
     p.startTime || '-',
     p.interval || '-',
-    p.endTime || '-'
+    p.endTime || '-',
+    p.isNegative ? 'Negativo' : 'Normal'
   ]);
 
   autoTable(doc, {
     startY: y,
-    head: [['Início', 'Intervalo', 'Término']],
+    head: [['Início', 'Intervalo', 'Término', 'Tipo']],
     body: tableBody,
     theme: 'striped',
     headStyles: { fillColor: primaryColor },
-    foot: [['', 'Total de Pausas:', totalPauseTime]],
+    foot: [['', '', 'Total de Pausas:', totalPauseTime]],
     footStyles: { fillColor: [240, 242, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
     margin: { top: 10 },
+    didParseCell: function (data) {
+      // Check if the row corresponds to a negative pause
+      // data.row.index matches the index in tableBody
+      const rowIndex = data.row.index;
+      if (data.section === 'body' && rowIndex >= 0 && rowIndex < tableBody.length) {
+        const isNegative = tableBody[rowIndex][3] === 'Negativo';
+        if (isNegative) {
+          data.cell.styles.textColor = dangerColor;
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    }
   });
 
   y = (doc as any).lastAutoTable.finalY + 15;

@@ -1,3 +1,4 @@
+
 export enum MonitoriaType {
   RETENCAO = 'Retenção',
   SAC = 'SAC',
@@ -9,6 +10,8 @@ export interface PauseBlock {
   startTime: string;
   interval: string;
   endTime: string;
+  isNegative?: boolean;
+  useIntervalMode?: boolean;
 }
 
 export interface ReportFormState {
