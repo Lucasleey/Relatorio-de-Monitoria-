@@ -28,4 +28,4 @@ export interface ReportFormState {
   supervisorNote: string;
 }
 
-export const DEFAULT_PAUSE_LIMIT_MINUTES = 90; // 01:30
+export const DEFAULT_PAUSE_LIMIT_SECONDS = 90; // 01:30 (1 minute and 30 seconds)

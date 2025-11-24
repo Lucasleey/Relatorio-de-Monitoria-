@@ -1,8 +1,9 @@
 
+
 import React from 'react';
 import { PlusCircle, AlertCircle, Trash2, Clock, AlertTriangle, Timer } from 'lucide-react';
-import { PauseBlock, DEFAULT_PAUSE_LIMIT_MINUTES } from '../types';
-import { timeToMinutes, minutesToTime, calculateDuration } from '../utils';
+import { PauseBlock, DEFAULT_PAUSE_LIMIT_SECONDS } from '../types';
+import { timeToSeconds, secondsToTime, calculateTotalPauses, getEffectiveBlockDuration } from '../utils';
 
 interface Props {
   pauses: PauseBlock[];
@@ -35,22 +36,7 @@ export const PauseSection: React.FC<Props> = ({ pauses, onChange }) => {
     onChange(updatedPauses);
   };
 
-  // Helper to get the effective duration of a block for the TOTAL calculation
-  // We need to replicate the logic used in the card display
-  const getBlockDuration = (block: PauseBlock) => {
-    if (block.useIntervalMode) {
-      // Logic: Difference between Interval and End (Subtraction)
-      // Previously this was sumTime, now changed to calculateDuration as requested
-      return calculateDuration(block.interval, block.endTime);
-    } else {
-      // Logic: End - Start
-      return calculateDuration(block.startTime, block.endTime);
-    }
-  };
-
-  // Calculate total based on the specific logic of each block
-  const totalMinutes = pauses.reduce((acc, curr) => acc + timeToMinutes(getBlockDuration(curr)), 0);
-  const totalPauseTime = minutesToTime(totalMinutes);
+  const totalPauseTime = calculateTotalPauses(pauses);
 
   return (
     <section className="px-4 pb-6">
@@ -68,14 +54,13 @@ export const PauseSection: React.FC<Props> = ({ pauses, onChange }) => {
             onUpdate={updatePauseBlock} 
             onRemove={removePauseBlock} 
             showRemove={pauses.length > 1}
-            calculatedDuration={getBlockDuration(pause)}
           />
         ))}
 
         <div className="flex items-center justify-between rounded-xl bg-primary/5 p-3 px-4 dark:bg-primary/10">
           <div className="flex items-center gap-2 text-primary">
             <Clock className="h-5 w-5" />
-            <span className="font-semibold">Tempo Total Acumulado:</span>
+            <span className="font-semibold">Tempo Total Acumulado (Excedente):</span>
           </div>
           <span className="text-lg font-bold text-gray-900 dark:text-white">
             {totalPauseTime}
@@ -99,12 +84,12 @@ interface PauseCardProps {
   onUpdate: (id: string, field: keyof PauseBlock, value: any) => void;
   onRemove: (id: string) => void;
   showRemove: boolean;
-  calculatedDuration: string;
 }
 
-const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, showRemove, calculatedDuration }) => {
-  const durationMinutes = timeToMinutes(calculatedDuration);
-  const limitExceeded = durationMinutes > DEFAULT_PAUSE_LIMIT_MINUTES;
+const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, showRemove }) => {
+  const durationStr = getEffectiveBlockDuration(data);
+  const durationSeconds = timeToSeconds(durationStr);
+  const limitExceeded = durationSeconds > DEFAULT_PAUSE_LIMIT_SECONDS;
   
   // Styles for Negative Interval
   const inputColorClass = data.isNegative 
@@ -121,7 +106,7 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
         <button 
           onClick={() => onUpdate(data.id, 'useIntervalMode', !data.useIntervalMode)}
           className={`flex h-7 w-7 items-center justify-center rounded-full border shadow transition-colors ${data.useIntervalMode ? 'bg-primary text-white border-primary' : 'bg-gray-200 text-gray-500 border-transparent hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-400'}`}
-          title={data.useIntervalMode ? "Modo Intervalo Ativado (Subtração)" : "Modo Padrão (Subtração)"}
+          title={data.useIntervalMode ? "Modo Intervalo Ativado (Intervalo - Fim)" : "Modo Padrão (Fim - Início)"}
         >
           <Timer className="h-3.5 w-3.5" />
         </button>
@@ -175,17 +160,17 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
       {/* Status Bar (Result) */}
       <div className="mt-4 flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2.5 dark:bg-gray-800">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Tempo do Bloco:
+          Duração do Bloco (MM:SS):
         </span>
         <div className="flex items-center gap-2">
           <span className={`text-sm font-bold ${limitExceeded ? 'text-danger' : 'text-gray-900 dark:text-white'}`}>
-            {calculatedDuration || '00:00'}
+            {durationStr || '00:00'}
           </span>
-          {limitExceeded && (
+          {limitExceeded && !data.isNegative && (
             <>
               <AlertCircle className="h-4 w-4 text-danger" />
               <span className="text-xs font-medium text-danger">
-                (Max {minutesToTime(DEFAULT_PAUSE_LIMIT_MINUTES)})
+                (Max {secondsToTime(DEFAULT_PAUSE_LIMIT_SECONDS)})
               </span>
             </>
           )}
@@ -200,6 +185,8 @@ const TimeInput: React.FC<{ label: string; value: string; onChange: (val: string
     <span className={`mb-1.5 text-xs font-medium ${className?.includes('text-danger') ? 'text-danger' : 'text-gray-700 dark:text-gray-300'}`}>{label}</span>
     <input
       type="time"
+      // Note: "time" inputs usually default to HH:MM. We are interpreting HH as MM and MM as SS.
+      // We do not strictly need step="1" if we are using the HH:MM slots for MM:SS values.
       className={`w-full rounded-lg border px-2 py-2 text-center text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:placeholder:text-gray-500 ${className}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}

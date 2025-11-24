@@ -1,75 +1,103 @@
 
-import { ReportFormState, PauseBlock } from './types';
+import { ReportFormState, PauseBlock, DEFAULT_PAUSE_LIMIT_SECONDS } from './types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 /**
- * Converts HH:MM string to total minutes
+ * Converts "MM:SS" string to total seconds.
+ * Inputs from type="time" come as "01:45", which we interpret as 1 min 45 sec.
  */
-export const timeToMinutes = (time: string): number => {
+export const timeToSeconds = (time: string): number => {
   if (!time) return 0;
-  const [hours, minutes] = time.split(':').map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
+  // We interpret the standard HTML time input (HH:MM) as (MM:SS) for this specific report requirement
+  const [minutes, seconds] = time.split(':').map(Number);
+  return (minutes || 0) * 60 + (seconds || 0);
 };
 
 /**
- * Converts total minutes to HH:MM string
+ * Converts total seconds to "MM:SS" string
  */
-export const minutesToTime = (minutes: number): string => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+export const secondsToTime = (totalSeconds: number): string => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
 /**
- * Calculates duration between two time strings. 
- * Handles crossing midnight if end < start (adds 24h).
+ * Calculates duration between two time strings in seconds.
+ * Logic: End - Start
+ * Handles negative results by returning 0 (unless handled by specific logic elsewhere)
  */
 export const calculateDuration = (start: string, end: string): string => {
   if (!start || !end) return '';
   
-  let startMins = timeToMinutes(start);
-  let endMins = timeToMinutes(end);
+  let startSecs = timeToSeconds(start);
+  let endSecs = timeToSeconds(end);
 
-  if (endMins < startMins) {
-    endMins += 24 * 60; // Cross midnight
+  // If end is smaller than start (e.g. crossing "hour"), we assume simple subtraction
+  // usually resulting in negative, but for pauses, we expect strict timeline.
+  // If end < start, we return 00:00 to avoid confusing display, or handle absolute diff.
+  if (endSecs < startSecs) {
+    return '00:00'; 
   }
 
-  return minutesToTime(endMins - startMins);
+  return secondsToTime(endSecs - startSecs);
 };
 
 /**
- * Adds duration to start time to get end time
+ * Calculates duration based on Interval Mode (Subtraction: Interval - End)
  */
-export const addTime = (start: string, duration: string): string => {
-  if (!start || !duration) return '';
-  const startMins = timeToMinutes(start);
-  const durationMins = timeToMinutes(duration);
-  const totalMins = (startMins + durationMins) % (24 * 60);
-  return minutesToTime(totalMins);
+export const calculateIntervalSubtraction = (interval: string, end: string): string => {
+  if (!interval || !end) return '';
+  
+  const intervalSecs = timeToSeconds(interval);
+  const endSecs = timeToSeconds(end);
+
+  if (intervalSecs < endSecs) {
+    return '00:00';
+  }
+
+  return secondsToTime(intervalSecs - endSecs);
 };
 
 /**
- * Sums two time strings (Time A + Time B)
- * Used for the "Interval Mode" calculation
+ * Helper to get the effective duration of a block (MM:SS string)
+ * Centralizes the logic for UI and PDF
  */
-export const sumTime = (timeA: string, timeB: string): string => {
-  if (!timeA) return timeB || '';
-  if (!timeB) return timeA || '';
-  
-  const minsA = timeToMinutes(timeA);
-  const minsB = timeToMinutes(timeB);
-  
-  // Simple sum without 24h modulo, assuming durations for reporting
-  return minutesToTime(minsA + minsB);
+export const getEffectiveBlockDuration = (block: PauseBlock): string => {
+  if (block.useIntervalMode) {
+    // Mode Interval: Interval - End
+    return calculateIntervalSubtraction(block.interval, block.endTime);
+  } else {
+    // Mode Standard: End - Start
+    return calculateDuration(block.startTime, block.endTime);
+  }
 };
 
 /**
- * Calculates the sum of all pause intervals
+ * Calculates the total accumulated pause time based on business rules:
+ * 1. If Negative Block: Add FULL duration.
+ * 2. If Normal Block: Add only duration EXCEEDING 90 seconds (01:30).
  */
 export const calculateTotalPauses = (pauses: PauseBlock[]): string => {
-  const totalMinutes = pauses.reduce((acc, curr) => acc + timeToMinutes(curr.interval), 0);
-  return minutesToTime(totalMinutes);
+  let totalAccumulatedSeconds = 0;
+
+  pauses.forEach(block => {
+    const durationStr = getEffectiveBlockDuration(block);
+    const durationSeconds = timeToSeconds(durationStr);
+
+    if (block.isNegative) {
+      // Rule: Negative blocks add full time
+      totalAccumulatedSeconds += durationSeconds;
+    } else {
+      // Rule: Normal blocks add only what exceeds 90 seconds
+      if (durationSeconds > DEFAULT_PAUSE_LIMIT_SECONDS) {
+        totalAccumulatedSeconds += (durationSeconds - DEFAULT_PAUSE_LIMIT_SECONDS);
+      }
+    }
+  });
+
+  return secondsToTime(totalAccumulatedSeconds);
 };
 
 /**
@@ -85,42 +113,6 @@ export const downloadFile = (filename: string, content: string, mimeType: string
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-};
-
-/**
- * Generates a plain text report
- */
-export const generateReportText = (data: ReportFormState): string => {
-  const totalPauseTime = calculateTotalPauses(data.pauses);
-  
-  return `RELATÓRIO DE MONITORIA
-    
-INFORMAÇÕES GERAIS
-------------------
-Tipo: ${data.monitoriaType}
-Operador: ${data.operatorData}
-Data: ${data.date}
-Contrato: ${data.contract}
-Protocolo: ${data.protocol}
-Momento: ${data.communicationTime}
-
-PAUSAS
-------
-${data.pauses.map((p, i) => `Bloco ${i + 1}: Início ${p.startTime} | Intervalo ${p.interval} | Término ${p.endTime} ${p.isNegative ? '(Negativo)' : ''}`).join('\n')}
-
-Tempo Total de Pausas: ${totalPauseTime}
-
-OBSERVAÇÕES
------------
-Notas do Monitor: 
-${data.monitorNotes}
-
-Pontos a Observar:
-${data.observationPoints}
-
-Nota para Supervisor:
-${data.supervisorNote}
-`;
 };
 
 /**
@@ -168,20 +160,24 @@ export const generateReportHtml = (data: ReportFormState): string => {
               <th>Início</th>
               <th>Intervalo</th>
               <th>Término</th>
+              <th>Duração</th>
               <th>Tipo</th>
             </tr>
           </thead>
           <tbody>
-            ${data.pauses.map(p => `
+            ${data.pauses.map(p => {
+              const duration = getEffectiveBlockDuration(p);
+              return `
               <tr class="${p.isNegative ? 'negative' : ''}">
                 <td>${p.startTime || '-'}</td>
                 <td>${p.interval || '-'}</td>
                 <td>${p.endTime || '-'}</td>
+                <td>${duration}</td>
                 <td>${p.isNegative ? 'Negativo' : 'Normal'}</td>
               </tr>
-            `).join('')}
+            `}).join('')}
             <tr class="total-row">
-              <td colspan="3" style="text-align: right;">Tempo Total de Pausas:</td>
+              <td colspan="4" style="text-align: right;">Tempo Total Acumulado (Excedente):</td>
               <td>${totalPauseTime}</td>
             </tr>
           </tbody>
@@ -200,6 +196,45 @@ export const generateReportHtml = (data: ReportFormState): string => {
     </body>
     </html>
     `;
+};
+
+/**
+ * Generates a plain text report
+ */
+export const generateReportText = (data: ReportFormState): string => {
+  const totalPauseTime = calculateTotalPauses(data.pauses);
+  
+  return `RELATÓRIO DE MONITORIA
+    
+INFORMAÇÕES GERAIS
+------------------
+Tipo: ${data.monitoriaType}
+Operador: ${data.operatorData}
+Data: ${data.date}
+Contrato: ${data.contract}
+Protocolo: ${data.protocol}
+Momento: ${data.communicationTime}
+
+PAUSAS
+------
+${data.pauses.map((p, i) => {
+  const duration = getEffectiveBlockDuration(p);
+  return `Bloco ${i + 1}: Início ${p.startTime} | Intervalo ${p.interval} | Término ${p.endTime} | Duração: ${duration} ${p.isNegative ? '(Negativo)' : ''}`;
+}).join('\n')}
+
+Tempo Total Acumulado (Excedente): ${totalPauseTime}
+
+OBSERVAÇÕES
+-----------
+Notas do Monitor: 
+${data.monitorNotes}
+
+Pontos a Observar:
+${data.observationPoints}
+
+Nota para Supervisor:
+${data.supervisorNote}
+`;
 };
 
 /**
@@ -264,24 +299,24 @@ export const generatePDF = (data: ReportFormState) => {
     p.startTime || '-',
     p.interval || '-',
     p.endTime || '-',
+    getEffectiveBlockDuration(p), // Show MM:SS
     p.isNegative ? 'Negativo' : 'Normal'
   ]);
 
   autoTable(doc, {
     startY: y,
-    head: [['Início', 'Intervalo', 'Término', 'Tipo']],
+    head: [['Início', 'Intervalo', 'Término', 'Duração (MM:SS)', 'Tipo']],
     body: tableBody,
     theme: 'striped',
     headStyles: { fillColor: primaryColor },
-    foot: [['', '', 'Total de Pausas:', totalPauseTime]],
+    foot: [['', '', '', 'Total Acumulado:', totalPauseTime]],
     footStyles: { fillColor: [240, 242, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
     margin: { top: 10 },
     didParseCell: function (data) {
-      // Check if the row corresponds to a negative pause
-      // data.row.index matches the index in tableBody
       const rowIndex = data.row.index;
       if (data.section === 'body' && rowIndex >= 0 && rowIndex < tableBody.length) {
-        const isNegative = tableBody[rowIndex][3] === 'Negativo';
+        // Index 4 is 'Tipo' column
+        const isNegative = tableBody[rowIndex][4] === 'Negativo';
         if (isNegative) {
           data.cell.styles.textColor = dangerColor;
           data.cell.styles.fontStyle = 'bold';
