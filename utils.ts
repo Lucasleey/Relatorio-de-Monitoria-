@@ -45,7 +45,8 @@ export const calculateDuration = (start: string, end: string): string => {
 };
 
 /**
- * Calculates duration based on Interval Mode (Subtraction: Interval - End)
+ * Calculates duration based on Interval Mode (Subtraction: End - Interval)
+ * Previously was incorrectly set to Interval - End.
  */
 export const calculateIntervalSubtraction = (interval: string, end: string): string => {
   if (!interval || !end) return '';
@@ -53,11 +54,12 @@ export const calculateIntervalSubtraction = (interval: string, end: string): str
   const intervalSecs = timeToSeconds(interval);
   const endSecs = timeToSeconds(end);
 
-  if (intervalSecs < endSecs) {
+  // If End is before Interval, it's invalid (or negative), return 00:00
+  if (endSecs < intervalSecs) {
     return '00:00';
   }
 
-  return secondsToTime(intervalSecs - endSecs);
+  return secondsToTime(endSecs - intervalSecs);
 };
 
 /**
@@ -66,7 +68,7 @@ export const calculateIntervalSubtraction = (interval: string, end: string): str
  */
 export const getEffectiveBlockDuration = (block: PauseBlock): string => {
   if (block.useIntervalMode) {
-    // Mode Interval: Interval - End
+    // Mode Interval: End - Interval
     return calculateIntervalSubtraction(block.interval, block.endTime);
   } else {
     // Mode Standard: End - Start
