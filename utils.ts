@@ -365,7 +365,21 @@ export const generatePDF = (data: ReportFormState) => {
   addNoteSection("Pontos a Observar", data.observationPoints);
   addNoteSection("Nota para Supervisor", data.supervisorNote);
 
-  // Save
-  const cleanProtocol = (data.protocol || 'novo').replace(/[^a-z0-9]/gi, '_');
-  doc.save(`relatorio_monitoria_${cleanProtocol}.pdf`);
+  // Save with format: FirstName Date(DD-MM-YY) Protocol.pdf
+  const firstName = (data.operatorData || '').trim().split(' ')[0] || 'Operador';
+  
+  let dateStr = '00-00-00';
+  if (data.date) {
+    // Input date is YYYY-MM-DD
+    const parts = data.date.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      dateStr = `${day}-${month}-${year.slice(-2)}`;
+    }
+  }
+
+  const protocol = data.protocol || '000000';
+  const filename = `${firstName} ${dateStr} ${protocol}.pdf`;
+  
+  doc.save(filename);
 };
