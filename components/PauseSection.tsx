@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { PlusCircle, AlertCircle, Trash2, Clock, AlertTriangle, Timer } from 'lucide-react';
 import { PauseBlock, DEFAULT_PAUSE_LIMIT_SECONDS } from '../types';
@@ -12,9 +11,16 @@ interface Props {
 
 export const PauseSection: React.FC<Props> = ({ pauses, onChange }) => {
   
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2, 11);
+  };
+
   const addPauseBlock = () => {
     const newBlock: PauseBlock = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       startTime: '',
       interval: '', 
       endTime: '',
@@ -91,7 +97,6 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
   const durationSeconds = timeToSeconds(durationStr);
   const limitExceeded = durationSeconds > DEFAULT_PAUSE_LIMIT_SECONDS;
   
-  // Styles for Negative Interval
   const inputColorClass = data.isNegative 
     ? 'text-danger font-bold bg-danger/5 border-danger/30' 
     : 'text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700';
@@ -99,34 +104,33 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
   return (
     <div className={`relative rounded-xl border p-4 shadow-sm transition-colors ${data.isNegative ? 'border-danger/50 bg-danger/5' : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900/50'}`}>
       
-      {/* Header Actions */}
-      <div className="absolute -right-2 -top-2 flex items-center gap-2">
-        
-        {/* Interval Mode Toggle */}
+      <div className="absolute -right-2 -top-2 flex items-center gap-2 z-10">
         <button 
+          type="button"
           onClick={() => onUpdate(data.id, 'useIntervalMode', !data.useIntervalMode)}
-          className={`flex h-7 w-7 items-center justify-center rounded-full border shadow transition-colors ${data.useIntervalMode ? 'bg-primary text-white border-primary' : 'bg-gray-200 text-gray-500 border-transparent hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-400'}`}
-          title={data.useIntervalMode ? "Modo Intervalo Ativado (Intervalo - Fim)" : "Modo Padrão (Fim - Início)"}
+          className={`flex h-8 w-8 items-center justify-center rounded-full border shadow-md transition-all active:scale-90 ${data.useIntervalMode ? 'bg-primary text-white border-primary' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'}`}
+          title={data.useIntervalMode ? "Modo Intervalo Ativado" : "Modo Padrão"}
         >
-          <Timer className="h-3.5 w-3.5" />
+          <Timer className="h-4 w-4" />
         </button>
 
-        {/* Negative Toggle */}
         <button 
+          type="button"
           onClick={() => onUpdate(data.id, 'isNegative', !data.isNegative)}
-          className={`flex h-7 w-7 items-center justify-center rounded-full border shadow transition-colors ${data.isNegative ? 'bg-danger text-white border-danger' : 'bg-gray-200 text-gray-500 border-transparent hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-400'}`}
+          className={`flex h-8 w-8 items-center justify-center rounded-full border shadow-md transition-all active:scale-90 ${data.isNegative ? 'bg-danger text-white border-danger' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'}`}
           title="Intervalo Negativo"
         >
-          <AlertTriangle className="h-3.5 w-3.5" />
+          <AlertTriangle className="h-4 w-4" />
         </button>
 
         {showRemove && (
           <button 
+            type="button"
             onClick={() => onRemove(data.id)}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-500 shadow hover:bg-danger hover:text-white dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-danger"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-500 border border-gray-200 shadow-md hover:bg-danger hover:text-white hover:border-danger transition-all active:scale-90 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
             title="Remover bloco"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -139,7 +143,6 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
           className={inputColorClass}
         />
         
-        {/* Interval Input: VISIBLE only if useIntervalMode is TRUE */}
         <div className={data.useIntervalMode ? 'block' : 'invisible'}>
           <TimeInput 
             label="Intervalo" 
@@ -157,7 +160,6 @@ const PauseBlockCard: React.FC<PauseCardProps> = ({ data, onUpdate, onRemove, sh
         />
       </div>
 
-      {/* Status Bar (Result) */}
       <div className="mt-4 flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2.5 dark:bg-gray-800">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Duração do Bloco (MM:SS):
@@ -185,8 +187,6 @@ const TimeInput: React.FC<{ label: string; value: string; onChange: (val: string
     <span className={`mb-1.5 text-xs font-medium ${className?.includes('text-danger') ? 'text-danger' : 'text-gray-700 dark:text-gray-300'}`}>{label}</span>
     <input
       type="time"
-      // Note: "time" inputs usually default to HH:MM. We are interpreting HH as MM and MM as SS.
-      // We do not strictly need step="1" if we are using the HH:MM slots for MM:SS values.
       className={`w-full rounded-lg border px-2 py-2 text-center text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:placeholder:text-gray-500 ${className}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}

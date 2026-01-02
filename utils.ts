@@ -3,13 +3,36 @@ import { ReportFormState, PauseBlock, DEFAULT_PAUSE_LIMIT_SECONDS } from './type
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const STORAGE_KEY_OPERATORS = 'monitoria_saved_operators';
+
+export const saveOperatorName = (name: string) => {
+  const saved = getSavedOperatorNames();
+  if (name && !saved.includes(name)) {
+    const updated = [...saved, name].sort();
+    localStorage.setItem(STORAGE_KEY_OPERATORS, JSON.stringify(updated));
+  }
+};
+
+export const getSavedOperatorNames = (): string[] => {
+  const data = localStorage.getItem(STORAGE_KEY_OPERATORS);
+  try {
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const deleteSavedOperatorName = (name: string) => {
+  const saved = getSavedOperatorNames();
+  const updated = saved.filter(n => n !== name);
+  localStorage.setItem(STORAGE_KEY_OPERATORS, JSON.stringify(updated));
+};
+
 /**
  * Converts "MM:SS" string to total seconds.
- * Inputs from type="time" come as "01:45", which we interpret as 1 min 45 sec.
  */
 export const timeToSeconds = (time: string): number => {
   if (!time) return 0;
-  // We interpret the standard HTML time input (HH:MM) as (MM:SS) for this specific report requirement
   const [minutes, seconds] = time.split(':').map(Number);
   return (minutes || 0) * 60 + (seconds || 0);
 };
@@ -25,80 +48,53 @@ export const secondsToTime = (totalSeconds: number): string => {
 
 /**
  * Calculates duration between two time strings in seconds.
- * Logic: End - Start
- * Handles negative results by returning 0 (unless handled by specific logic elsewhere)
  */
 export const calculateDuration = (start: string, end: string): string => {
   if (!start || !end) return '';
-  
   let startSecs = timeToSeconds(start);
   let endSecs = timeToSeconds(end);
-
-  // If end is smaller than start (e.g. crossing "hour"), we assume simple subtraction
-  // usually resulting in negative, but for pauses, we expect strict timeline.
-  // If end < start, we return 00:00 to avoid confusing display, or handle absolute diff.
-  if (endSecs < startSecs) {
-    return '00:00'; 
-  }
-
+  if (endSecs < startSecs) return '00:00'; 
   return secondsToTime(endSecs - startSecs);
 };
 
 /**
  * Calculates duration based on Interval Mode (Subtraction: End - Interval)
- * Previously was incorrectly set to Interval - End.
  */
 export const calculateIntervalSubtraction = (interval: string, end: string): string => {
   if (!interval || !end) return '';
-  
   const intervalSecs = timeToSeconds(interval);
   const endSecs = timeToSeconds(end);
-
-  // If End is before Interval, it's invalid (or negative), return 00:00
-  if (endSecs < intervalSecs) {
-    return '00:00';
-  }
-
+  if (endSecs < intervalSecs) return '00:00';
   return secondsToTime(endSecs - intervalSecs);
 };
 
 /**
  * Helper to get the effective duration of a block (MM:SS string)
- * Centralizes the logic for UI and PDF
  */
 export const getEffectiveBlockDuration = (block: PauseBlock): string => {
   if (block.useIntervalMode) {
-    // Mode Interval: End - Interval
     return calculateIntervalSubtraction(block.interval, block.endTime);
   } else {
-    // Mode Standard: End - Start
     return calculateDuration(block.startTime, block.endTime);
   }
 };
 
 /**
- * Calculates the total accumulated pause time based on business rules:
- * 1. If Negative Block: Add FULL duration.
- * 2. If Normal Block: Add only duration EXCEEDING 90 seconds (01:30).
+ * Calculates the total accumulated pause time.
  */
 export const calculateTotalPauses = (pauses: PauseBlock[]): string => {
   let totalAccumulatedSeconds = 0;
-
   pauses.forEach(block => {
     const durationStr = getEffectiveBlockDuration(block);
     const durationSeconds = timeToSeconds(durationStr);
-
     if (block.isNegative) {
-      // Rule: Negative blocks add full time
       totalAccumulatedSeconds += durationSeconds;
     } else {
-      // Rule: Normal blocks add only what exceeds 90 seconds
       if (durationSeconds > DEFAULT_PAUSE_LIMIT_SECONDS) {
         totalAccumulatedSeconds += (durationSeconds - DEFAULT_PAUSE_LIMIT_SECONDS);
       }
     }
   });
-
   return secondsToTime(totalAccumulatedSeconds);
 };
 
@@ -122,7 +118,6 @@ export const downloadFile = (filename: string, content: string, mimeType: string
  */
 export const generateReportHtml = (data: ReportFormState): string => {
   const totalPauseTime = calculateTotalPauses(data.pauses);
-
   return `
     <!DOCTYPE html>
     <html>
@@ -146,7 +141,6 @@ export const generateReportHtml = (data: ReportFormState): string => {
     </head>
     <body>
         <h1>Relatório de Monitoria</h1>
-        
         <h2>Informações Gerais</h2>
         <div class="field-row"><span class="label">Tipo de Monitoria:</span> <span class="value">${data.monitoriaType}</span></div>
         <div class="field-row"><span class="label">Operador:</span> <span class="value">${data.operatorData}</span></div>
@@ -154,7 +148,6 @@ export const generateReportHtml = (data: ReportFormState): string => {
         <div class="field-row"><span class="label">Contrato:</span> <span class="value">${data.contract}</span></div>
         <div class="field-row"><span class="label">Protocolo:</span> <span class="value">${data.protocol}</span></div>
         <div class="field-row"><span class="label">Momento da comunicação:</span> <span class="value">${data.communicationTime}</span></div>
-
         <h2>Gestão de Pausas</h2>
         <table>
           <thead>
@@ -184,15 +177,11 @@ export const generateReportHtml = (data: ReportFormState): string => {
             </tr>
           </tbody>
         </table>
-
         <h2>Observações</h2>
-        
         <h3>Notas do Monitor</h3>
         <div class="notes">${data.monitorNotes || 'Sem notas.'}</div>
-
         <h3>Pontos a Observar</h3>
         <div class="notes">${data.observationPoints || 'Sem observações.'}</div>
-
         <h3>Nota para Supervisor</h3>
         <div class="notes">${data.supervisorNote || 'Sem notas para o supervisor.'}</div>
     </body>
@@ -205,9 +194,7 @@ export const generateReportHtml = (data: ReportFormState): string => {
  */
 export const generateReportText = (data: ReportFormState): string => {
   const totalPauseTime = calculateTotalPauses(data.pauses);
-  
   return `RELATÓRIO DE MONITORIA
-    
 INFORMAÇÕES GERAIS
 ------------------
 Tipo: ${data.monitoriaType}
@@ -216,24 +203,19 @@ Data: ${data.date}
 Contrato: ${data.contract}
 Protocolo: ${data.protocol}
 Momento: ${data.communicationTime}
-
 PAUSAS
 ------
 ${data.pauses.map((p, i) => {
   const duration = getEffectiveBlockDuration(p);
   return `Bloco ${i + 1}: Início ${p.startTime} | Intervalo ${p.interval} | Término ${p.endTime} | Duração: ${duration} ${p.isNegative ? '(Negativo)' : ''}`;
 }).join('\n')}
-
 Tempo Total Acumulado (Excedente): ${totalPauseTime}
-
 OBSERVAÇÕES
 -----------
 Notas do Monitor: 
 ${data.monitorNotes}
-
 Pontos a Observar:
 ${data.observationPoints}
-
 Nota para Supervisor:
 ${data.supervisorNote}
 `;
@@ -244,13 +226,10 @@ ${data.supervisorNote}
  */
 export const generatePDF = (data: ReportFormState) => {
   const doc = new jsPDF();
-  
-  // Colors
-  const primaryColor: [number, number, number] = [0, 90, 156]; // #005A9C
+  const primaryColor: [number, number, number] = [0, 90, 156]; 
   const grayColor: [number, number, number] = [80, 80, 80];
-  const dangerColor: [number, number, number] = [211, 47, 47]; // #D32F2F
+  const dangerColor: [number, number, number] = [211, 47, 47]; 
 
-  // Header
   doc.setFontSize(20);
   doc.setTextColor(...primaryColor);
   doc.text("Relatório de Monitoria", 14, 20);
@@ -259,13 +238,10 @@ export const generatePDF = (data: ReportFormState) => {
   doc.line(14, 25, 196, 25);
 
   let y = 35;
-
-  // General Info
   doc.setFontSize(14);
   doc.setTextColor(0, 0, 0);
   doc.text("Informações Gerais", 14, y);
   y += 10;
-
   doc.setFontSize(10);
   doc.setTextColor(...grayColor);
   
@@ -286,22 +262,19 @@ export const generatePDF = (data: ReportFormState) => {
   addField("Protocolo", data.protocol, 14, y);
   y += 7;
   addField("Momento", data.communicationTime, 14, y);
-  
   y += 15;
 
-  // Pauses Table
   doc.setFontSize(14);
   doc.setTextColor(0, 0, 0);
   doc.text("Gestão de Pausas", 14, y);
   y += 5;
 
   const totalPauseTime = calculateTotalPauses(data.pauses);
-  
   const tableBody = data.pauses.map(p => [
     p.startTime || '-',
     p.interval || '-',
     p.endTime || '-',
-    getEffectiveBlockDuration(p), // Show MM:SS
+    getEffectiveBlockDuration(p),
     p.isNegative ? 'Negativo' : 'Normal'
   ]);
 
@@ -317,7 +290,6 @@ export const generatePDF = (data: ReportFormState) => {
     didParseCell: function (data) {
       const rowIndex = data.row.index;
       if (data.section === 'body' && rowIndex >= 0 && rowIndex < tableBody.length) {
-        // Index 4 is 'Tipo' column
         const isNegative = tableBody[rowIndex][4] === 'Negativo';
         if (isNegative) {
           data.cell.styles.textColor = dangerColor;
@@ -328,8 +300,6 @@ export const generatePDF = (data: ReportFormState) => {
   });
 
   y = (doc as any).lastAutoTable.finalY + 15;
-
-  // Observations
   const checkPageBreak = (neededHeight: number) => {
     if (y + neededHeight > 280) {
       doc.addPage();
@@ -350,11 +320,9 @@ export const generatePDF = (data: ReportFormState) => {
     doc.setFont('helvetica', 'bold');
     doc.text(title, 14, y);
     y += 6;
-    
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
     doc.setFont('helvetica', 'normal');
-    
     const splitText = doc.splitTextToSize(content || 'Nenhuma observação.', 180);
     checkPageBreak(splitText.length * 5 + 10);
     doc.text(splitText, 14, y);
@@ -365,21 +333,16 @@ export const generatePDF = (data: ReportFormState) => {
   addNoteSection("Pontos a Observar", data.observationPoints);
   addNoteSection("Nota para Supervisor", data.supervisorNote);
 
-  // Save with format: FirstName Date(DD-MM-YY) Protocol.pdf
   const firstName = (data.operatorData || '').trim().split(' ')[0] || 'Operador';
-  
   let dateStr = '00-00-00';
   if (data.date) {
-    // Input date is YYYY-MM-DD
     const parts = data.date.split('-');
     if (parts.length === 3) {
       const [year, month, day] = parts;
       dateStr = `${day}-${month}-${year.slice(-2)}`;
     }
   }
-
   const protocol = data.protocol || '000000';
   const filename = `${firstName} ${dateStr} ${protocol}.pdf`;
-  
   doc.save(filename);
 };
